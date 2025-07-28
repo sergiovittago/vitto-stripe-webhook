@@ -1,0 +1,2 @@
+# vitto-stripe-webhook
+WEBHOOK DE RECEBIMENTO DE STATUS DE PAGAMENTO
