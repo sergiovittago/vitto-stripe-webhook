@@ -31,74 +31,79 @@ worksheet = sheet.worksheet("PESSOA FISICA")
 
 @app.route("/webhook-stripe", methods=["POST"])
 def webhook_stripe():
-    payload = request.json
-
-    # 1. Recebe e trata uma requisição de estorno via AppSheet
-    if payload.get("acao") == "cancelar_assinatura":
-        subscription_id = payload.get("subscription_id", "").strip()
-        if not subscription_id:
-            return make_response("subscription_id ausente", 400)
-
-        try:
-            # Chamada para cancelar assinatura
-            response = requests.delete(
-                f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
-                auth=(STRIPE_SECRET_KEY, "")
-            )
-
-            if response.status_code == 200:
-                print(f"✅ Assinatura {subscription_id} cancelada com sucesso")
-                return jsonify({"status": "assinatura cancelada"}), 200
-            else:
-                print(f"❌ Falha ao cancelar assinatura: {response.text}")
-                return make_response("Erro ao cancelar", 500)
-        except Exception as e:
-            print(f"❌ Erro interno ao cancelar: {e}")
-            return make_response("Erro interno", 500)
-
-    # 2. Recebe e trata eventos normais do Stripe
-    event_type = payload.get("type")
-    data = payload.get("data", {}).get("object", {})
-
-    cpf = data.get("client_reference_id")
-    status = data.get("payment_status") or "desconhecido"
-    subscription_id = data.get("subscription")
-
-    print(f"📩 Evento: {event_type} | CPF: {cpf} | Status: {status} | Subscription: {subscription_id}")
-
-    if not cpf:
-        return make_response("CPF ausente no payload", 400)
-
     try:
+        payload = request.json
+        print("📥 Payload recebido:", json.dumps(payload, indent=2))
+
+        # 1. Requisição de cancelamento vinda do AppSheet
+        if payload.get("acao") == "cancelar_assinatura":
+            subscription_id = payload.get("subscription_id", "").strip()
+            print(f"🔧 Ação: cancelar_assinatura | Subscription ID: {subscription_id}")
+            if not subscription_id:
+                return make_response("subscription_id ausente", 400)
+
+            try:
+                response = requests.delete(
+                    f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
+                    auth=(STRIPE_SECRET_KEY, "")
+                )
+
+                print("🔄 Resposta da API Stripe:", response.status_code, response.text)
+
+                if response.status_code == 200:
+                    print(f"✅ Assinatura {subscription_id} cancelada com sucesso")
+                    return jsonify({"status": "assinatura cancelada"}), 200
+                else:
+                    print(f"❌ Falha ao cancelar assinatura: {response.text}")
+                    return make_response("Erro ao cancelar", 500)
+            except Exception as e:
+                print(f"❌ Erro interno no cancelamento: {e}")
+                return make_response("Erro interno", 500)
+
+        # 2. Eventos normais do Stripe
+        event_type = payload.get("type")
+        data = payload.get("data", {}).get("object", {})
+        cpf = data.get("client_reference_id")
+        status = data.get("payment_status") or "desconhecido"
+        subscription_id = data.get("subscription")
+
+        print(f"📡 Evento Stripe: {event_type}")
+        print(f"📄 Dados extraídos: CPF={cpf} | Status={status} | Subscription={subscription_id}")
+
+        if not cpf:
+            print("⚠️ CPF ausente no payload")
+            return make_response("CPF ausente no payload", 400)
+
         all_rows = worksheet.get_all_values()
         header = all_rows[0]
-
         col_cpf = 2  # Coluna B
         col_status = header.index("STATUS LINK PAGAMENTO") + 1
         col_status_final = 8  # Coluna H
-        col_assinatura = header.index("ID ASSINATURA") + 1  # Coluna W
+        col_assinatura = header.index("ID ASSINATURA") + 1
+
+        cpf_recebido = cpf.strip().zfill(11)
 
         for i, row in enumerate(all_rows[1:], start=2):
             cpf_planilha = row[col_cpf - 1].strip().zfill(11)
-            cpf_recebido = cpf.strip().zfill(11)
 
             if cpf_planilha == cpf_recebido:
+                print(f"📝 Atualizando linha {i} para CPF {cpf_recebido}")
                 worksheet.update_cell(i, col_status, status)
 
                 if status.lower() == "paid":
+                    print(f"💰 Pagamento confirmado - Atualizando liberação e assinatura")
                     worksheet.update_cell(i, col_status_final, "LIBERAÇÃO")
-
                     if subscription_id:
                         worksheet.update_cell(i, col_assinatura, subscription_id)
 
-                print(f"✅ Linha {i} atualizada com status '{status}' e assinatura '{subscription_id}'")
+                print(f"✅ Atualização concluída na linha {i}")
                 return jsonify({"status": "ok"}), 200
 
         print("❌ CPF não localizado na planilha")
         return make_response("CPF não encontrado", 404)
 
     except Exception as e:
-        print(f"❌ Erro interno: {e}")
+        print(f"🔥 Erro interno inesperado: {e}")
         return make_response("Erro interno", 500)
 
 if __name__ == "__main__":
