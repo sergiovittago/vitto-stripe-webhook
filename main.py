@@ -16,7 +16,8 @@ STRIPE_SECRET_KEY_BASE64 = """
 c2tfbGl2ZV81MVJuZ0QyQW13UlhOVGlGRGgwVkpxM2NJbFFTSWI1RUxvN2dudnlPRXQ4SmhJUzJwSDM2cDRuTVBRS29mblBZZWhwZVFRb3VWeXhVMG9LbXg2Z0JxWFVJRjAwS0RuYlJUNWs=
 """.strip()
 
-STRIPE_SECRET_KEY = base64.b64decode(STRIPE_SECRET_KEY_BASE64).decode("utf-8")
+STRIPE_SECRET_KEY = "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"
+
 
 # === Autenticação com Google Sheets ===
 cred_dict = json.loads(base64.b64decode(GOOGLE_CREDENTIALS_BASE64).decode("utf-8"))
