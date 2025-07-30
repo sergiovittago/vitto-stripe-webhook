@@ -29,8 +29,9 @@ def webhook_stripe():
 
     cpf = data.get("client_reference_id")
     status = data.get("payment_status") or "desconhecido"
+    subscription_id = data.get("subscription")  # ID da assinatura
 
-    print(f"📩 Evento: {event_type} | CPF: {cpf} | Status: {status}")
+    print(f"📩 Evento: {event_type} | CPF: {cpf} | Status: {status} | Subscription: {subscription_id}")
 
     if not cpf:
         return make_response("CPF ausente no payload", 400)
@@ -42,6 +43,7 @@ def webhook_stripe():
         col_cpf = 2  # Coluna B
         col_status = header.index("STATUS LINK PAGAMENTO") + 1
         col_status_final = 8  # Coluna H
+        col_assinatura = header.index("ID ASSINATURA") + 1  # Coluna W
 
         for i, row in enumerate(all_rows[1:], start=2):
             cpf_planilha = row[col_cpf - 1].strip().zfill(11)
@@ -53,7 +55,10 @@ def webhook_stripe():
                 if status.lower() == "paid":
                     worksheet.update_cell(i, col_status_final, "LIBERAÇÃO")
 
-                print(f"✅ Linha {i} atualizada com status '{status}'")
+                    if subscription_id:
+                        worksheet.update_cell(i, col_assinatura, subscription_id)
+
+                print(f"✅ Linha {i} atualizada com status '{status}' e assinatura '{subscription_id}'")
                 return jsonify({"status": "ok"}), 200
 
         print("❌ CPF não localizado na planilha")
